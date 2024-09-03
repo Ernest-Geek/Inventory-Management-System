@@ -1,0 +1,5 @@
+from werkzeug.security import generate_password_hash
+
+# Generate a hashed password
+hashed_password = generate_password_hash('scrypt:32768:8:1$CxSneAGf3hPy1F8n$0a1df1f0f35fa8337518b3a61fcb4fbf50738811390a7c4d0408232ba4f3d68ed29af4f6ea0ccfc6a56881583057fad9ebf3f46d127e49756af230d3b479fa31')
+print(hashed_password)
