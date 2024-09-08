@@ -24,10 +24,9 @@ CREATE TABLE products (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     description TEXT,
-    price INT NOT NULL,
+    price FLOAT NOT NULL,
     stock INT NOT NULL,
-    category TEXT,
-
+    category TEXT
 );
 
 -- Create sales table

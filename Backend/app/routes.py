@@ -3,24 +3,31 @@ from flask_login import login_required, login_user, logout_user, current_user
 from flask_mail import Message
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired
-from app.models import db, User, Role
-from app import mail, bcrypt
 from app.models import db, User, Role, Product, Sale
-from app.email_utils import send_reset_email
+from app import mail, bcrypt
+from sqlalchemy import text
+from flask_bcrypt import Bcrypt
+from sqlalchemy import and_
+from sqlalchemy.exc import IntegrityError
+import re
 
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+bcrypt = Bcrypt() 
 
-app = Flask(__name__)
-CORS(app)  
+bp = Blueprint('main', __name__)
 
-auth_bp = Blueprint('auth', __name__)
-bp = Blueprint('routes', __name__)
-
-cors = CORS(bp, resources={r"/api/*": {"origins": "*"}})
-
-#URL serializer for password reset
+# URL serializer for password reset
 s = URLSafeTimedSerializer('Thisisasecret!')
+
+
+#Route to test if the backend is working
+@bp.route('/api/test_db')
+def test_db():
+    try:
+        # Use text() to explicitly declare the SQL expression
+        result = db.session.execute(text('SELECT 1'))
+        return 'Database connection successful!'
+    except Exception as e:
+        return f'Error connecting to database: {str(e)}'
 
 @bp.route("/api/register", methods=['POST'])
 def register():
@@ -44,7 +51,6 @@ def register():
     db.session.commit()
 
     return jsonify({"message": "User registered successfully"}), 201
-
 
 @bp.route('/api/login', methods=['POST'])
 def login():
@@ -71,24 +77,26 @@ def logout():
 
 @bp.route("/api/forgot_password", methods=["POST"])
 def forgot_password():
-    email = request.json.get('email')
-    if not email:
-        return jsonify({'message': 'Email is required'}), 400
+    data = request.json
+    email = data.get('email')
 
-    # Generate the reset link (implement your token generation logic here)
-    reset_link = f"http://localhost:3000/reset_password?email={email}&token=unique_token"
-    
-    # Call the function to send the email
-    if send_reset_email(email, reset_link):
-        return jsonify({'message': 'A reset link has been sent to your email address.'}), 200
-    else:
-        return jsonify({'message': 'Failed to send reset link. Please try again later.'}), 500
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"message": "User with this email does not exist"}), 404
 
+    token = s.dumps(email, salt='password-reset-salt') 
+
+    msg = Message('Password Reset Request', sender='noreply@demo.com', recipients=[email])
+    link = url_for('routes.reset_password', token=token, _external=True)
+    msg.body = f'Your link to reset the password is {link}. This link will expire in 30 minutes.'
+    mail.send(msg)
+
+    return jsonify({"message": "Password reset email sent successfully"}), 200
 
 @bp.route("/api/reset_password/<token>", methods=['POST'])
 def reset_password(token):
     try:
-        email = s.loads(token, salt='password-reset-salt', max_age=1800)  # Ensure this salt name matches
+        email = s.loads(token, salt='password-reset-salt', max_age=1800)  #
     except SignatureExpired:
         return jsonify({"message": "The token has expired"}), 400
     except Exception as e:
@@ -109,114 +117,178 @@ def reset_password(token):
 
     return jsonify({"message": "Password has been reset successfully"}), 200
 
-@bp.route("/api/user_roles", methods=['POST'])
-@login_required
-def user_roles():
-    if current_user.role.name != 'Admin':
-        abort(403)  # Forbidden
-
-    data = request.json
-    user_id = data.get('user_id')
-    new_role = data.get('role')
-
-    if not user_id or not new_role:
-        return jsonify({"message": "Missing required fields"}), 400
-
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({"message": "User not found"}), 404
-
-    role = Role.query.filter_by(name=new_role).first()
-    if not role:
-        return jsonify({"message": "Role not found"}), 404
-
-    user.role_id = role.id
-    db.session.commit()
-
-    return jsonify({"message": "User role updated successfully"}), 200
-
-@app.route('/api/add_product', methods=['POST'])
+@bp.route('/api/add_product', methods=['POST'])
 def add_product():
-    data = request.json
-    name = data.get('name')
-    description = data.get('description')
-    stock = data.get('stock')
-    price = data.get('price')
-    category = data.get('category')
+    try:
+        data = request.get_json()
+        name = data.get('name')
+        description = data.get('description')
+        price = data.get('price')
+        stock = data.get('stock')
 
-    if not all([name, stock, price]):
-        return jsonify({"message": "Missing required fields"}), 400
+        if not name or not price or not stock:
+            return jsonify({'message': 'Name, price, stock are required'}), 400
+
+        new_product = Product(name=name, description=description, price=price, stock=stock)
+        db.session.add(new_product)
+        db.session.commit()
+
+        return jsonify({'message': 'Product added successfully'}), 201
+
+    except Exception as e:
+        print(f"Error adding product: {e}")
+        return jsonify({'message': 'Failed to add product', 'error': str(e)}), 500
+    
+@bp.route('/api/products', methods=['GET'])
+def get_products():
+    try:
+        products = Product.query.all()
+        products_list = [{'id': p.id, 'name': p.name, 'description': p.description, 'price': p.price, 'stock': p.stock} for p in products]
+        return jsonify(products_list), 200
+    except Exception as e:
+        print(f"Error fetching products: {e}")
+        return jsonify({'message': 'Failed to fetch products', 'error': str(e)}), 500
+
+
+@bp.route('/api/products/<int:product_id>', methods=['DELETE'])
+def delete_product(product_id):
+    try:
+        # Retrieve the product
+        product = Product.query.get(product_id)
+        if not product:
+            return jsonify({'message': 'Product not found'}), 404
+
+        # Check if there are any sales associated with the product
+        if Sale.query.filter_by(product_id=product_id).count() > 0:
+            return jsonify({'message': 'Product cannot be deleted as it is referenced in sales'}), 400
+
+        # Delete the product
+        db.session.delete(product)
+        db.session.commit()
+
+        return jsonify({'message': 'Product deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error deleting product: {e}")
+        return jsonify({'message': 'Failed to delete product', 'error': str(e)}), 500
+
+    
+@bp.route('/api/products/<int:product_id>/update_stock', methods=['PUT'])
+def update_stock(product_id):
+    product = Product.query.get(product_id)
+    
+    if not product:
+        return jsonify({'message': 'Product not found'}), 404
+
+    data = request.get_json()
+    stock = data.get('stock')
+
+    if stock is None:
+        return jsonify({'message': 'Stock level is required'}), 400
+
+    if not isinstance(stock, int) or stock < 0:
+        return jsonify({'message': 'Stock must be a non-negative integer'}), 400
 
     try:
-        stock = int(stock)
-        price = float(price)
-    except ValueError:
-        return jsonify({"message": "Invalid number format"}), 400
-
-    product = Product(name=name, description=description, stock=stock, price=price, category=category)
-    db.session.add(product)
-    db.session.commit()
-
-    return jsonify({"message": "Product added successfully"}), 201
-
-if __name__ == '__main__':
-    app.run(debug=True)
-
-@bp.route("/api/update_stock", methods=['POST'])
-@login_required
-def update_stock():
-    if current_user.role.name not in ['Manager', 'Admin']:
-        abort(403)  # Forbidden
-
-    data = request.json
+        product.stock = stock
+        db.session.commit()
+        return jsonify({'message': 'Stock updated successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': 'Failed to update stock', 'error': str(e)}), 500
+    
+@bp.route('/api/sales', methods=['POST'])
+def add_sale():
+    data = request.get_json()
     product_id = data.get('product_id')
     quantity = data.get('quantity')
+    total_price = data.get('total_price')
+    sale_date = data.get('sale_date')
 
-    if not product_id or quantity is None:
-        return jsonify({"message": "Missing required fields"}), 400
+    if not all([product_id, quantity, total_price, sale_date]):
+        return jsonify({'message': 'Missing data'}), 400
 
     product = Product.query.get(product_id)
     if not product:
-        return jsonify({"message": "Product not found"}), 404
+        return jsonify({'message': 'Product not found'}), 404
 
-    product.stock = quantity
-    db.session.commit()
+    try:
+        sale = Sale(
+            product_id=product_id,
+            quantity=quantity,
+            total_price=total_price,
+            sale_date=sale_date
+        )
+        db.session.add(sale)
+        db.session.commit()
+        return jsonify({'message': 'Sale added successfully'}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': 'Failed to add sale', 'error': str(e)}), 500
+    
+@bp.route('/api/sales', methods=['GET'])
+def get_sales():
+    try:
+        # Query to join Sales with Products to get product names
+        sales = db.session.query(Sale, Product.name).join(Product).all()
+        
+        # Format the data
+        sales_data = [
+            {
+                'id': sale.id,
+                'sale_date': sale.sale_date.isoformat(),
+                'product_name': product_name,
+                'total_price': sale.total_price
+            }
+            for sale, product_name in sales
+        ]
+        
+        return jsonify(sales_data)
+    except Exception as e:
+        return jsonify({'message': 'Failed to fetch sales data', 'error': str(e)}), 500
 
-    return jsonify({"message": "Stock updated successfully"}), 200
+@bp.route('/api/reports/generate', methods=['GET'])
+def generate_report():
+    report_type = request.args.get('report_type', 'summary')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    if not start_date or not end_date:
+        return jsonify({'message': 'Start date and end date are required'}), 400
 
+    sales_query = db.session.query(Sale, Product.name).join(Product).filter(
+        and_(Sale.sale_date >= start_date, Sale.sale_date <= end_date)
+    ).all()
 
-
-@bp.route("/api/track_sales", methods=['GET'])
-@login_required
-def track_sales():
-    sales = Sale.query.order_by(Sale.sale_date.desc()).all()
-    return jsonify([
+    sales_data = [
         {
             'id': sale.id,
-            'product_id': sale.product_id,
-            'quantity': sale.quantity,
+            'date': sale.sale_date.isoformat(),
+            'product_name': product_name,
             'total_price': sale.total_price,
-            'sale_date': sale.sale_date
+            'quantity': sale.quantity,
+            'details': f"{sale.quantity} {product_name}(s) purchased"
         }
-        for sale in sales
-    ])
+        for sale, product_name in sales_query
+    ]
 
-@bp.route("/api/generate_report", methods=['GET'])
-@login_required
-def generate_report():
-    if current_user.role.name not in ['Admin', 'Manager']:
-        abort(403)
+    if report_type == 'summary':
+        report_data = [
+            {
+                'date': sale['date'],
+                'product_name': sale['product_name'],
+                'total_price': sale['total_price']
+            }
+            for sale in sales_data
+        ]
+    else:
+        report_data = sales_data
+    
+    return jsonify(report_data)
 
-    total_product = Product.query.count()
-    total_stock = sum([product.stock for product in Product.query.all()])
-    total_sales = Sale.query.count()
 
-    data = {
-        'total_product': total_product,
-        'total_stock': total_stock,
-        'total_sales': total_sales
-    }
 
-    return jsonify(data)
+
+
 
 

@@ -56,31 +56,21 @@ class Role(db.Model):
     def __repr__(self):
         return f'<Role {self.name}>'
 
-# Product model
+
 class Product(db.Model):
     __tablename__ = 'products'
-
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    description = db.Column(db.Text, nullable=True)
-    price = db.Column(db.Float, nullable=False)
-    stock = db.Column(db.Integer, nullable=False)
+    name = db.Column(db.String(80), nullable=False)
+    description = db.Column(db.String(200))
+    price = db.Column(db.Numeric(10, 2))
+    stock = db.Column(db.Integer)
+    sales = db.relationship('Sale', backref='product', lazy=True)
 
-    def __repr__(self):
-        return f'<Product {self.name}>'
-
-# Sale model
 class Sale(db.Model):
     __tablename__ = 'sales'
-
     id = db.Column(db.Integer, primary_key=True)
     product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
-    quantity = db.Column(db.Integer, nullable=False)
-    total_price = db.Column(db.Float, nullable=False)
+    quantity = db.Column(db.Integer)
+    total_price = db.Column(db.Float)
     sale_date = db.Column(db.DateTime, default=db.func.current_timestamp())
-
-    product = db.relationship('Product', backref='sales', lazy=True)
-
-    def __repr__(self):
-        return f'<Sale {self.id}>'
 
