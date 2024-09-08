@@ -1,17 +1,34 @@
 import React, { useState } from 'react';
-import { Box, TextField, Button, Typography, Paper, IconButton } from '@mui/material';
-import HomeIcon from '@mui/icons-material/Home'; // Home icon
+import { Box, TextField, Button, Typography, Paper, IconButton, InputAdornment, FormControl, InputLabel, OutlinedInput } from '@mui/material';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import axios from 'axios';
 import { useRouter } from 'next/router';
+import Layout from '../components/layout'; // Adjust the import path if necessary
 
 const RegisterPage = () => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+    // Check if passwords match
+    if (password !== confirmPassword) {
+      alert('Passwords do not match.');
+      return;
+    }
+
+    // Check if email is a Gmail address
+    if (!email.endsWith('@gmail.com')) {
+      alert('Only Gmail accounts can register.');
+      return;
+    }
+
     try {
       const response = await axios.post('http://localhost:5000/api/register', { username, email, password });
       alert(response.data.message);
@@ -22,83 +39,112 @@ const RegisterPage = () => {
     }
   };
 
+  const handleClickShowPassword = () => setShowPassword(!showPassword);
+  const handleClickShowConfirmPassword = () => setShowConfirmPassword(!showConfirmPassword);
+
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #6e45e2, #88d3ce)', // Gradient background
-        padding: 2,
-      }}
-    >
-      <Paper
-        elevation={6} // Slightly higher elevation for more depth
+    <Layout>
+      <Box
         sx={{
-          maxWidth: 400,
-          width: '100%',
-          padding: 4,
-          borderRadius: '8px',
-          backgroundColor: 'rgba(255, 255, 255, 0.9)', // Semi-transparent white background
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          padding: 2,
         }}
       >
-        {/* Home Button */}
-        <IconButton
-          onClick={() => router.push('/')}
+        <Paper
+          elevation={6}
           sx={{
-            color: '#333',
-            position: 'absolute',
-            top: 16,
-            left: 16,
+            maxWidth: 400,
+            width: '100%',
+            padding: 4,
+            borderRadius: '8px',
+            backgroundColor: 'rgba(255, 255, 255, 0.9)',
           }}
         >
-          <HomeIcon />
-        </IconButton>
-
-        <Typography variant="h4" gutterBottom align="center" sx={{ fontWeight: 'bold', color: '#333' }}>
-          Register
-        </Typography>
-        <form onSubmit={handleSubmit}>
-          <TextField
-            fullWidth
-            label="Username"
-            margin="normal"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            variant="outlined"
-            sx={{ mb: 2 }}
-          />
-          <TextField
-            fullWidth
-            label="Email"
-            type="email"
-            margin="normal"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            variant="outlined"
-            sx={{ mb: 2 }}
-          />
-          <TextField
-            fullWidth
-            label="Password"
-            type="password"
-            margin="normal"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            variant="outlined"
-            sx={{ mb: 3 }}
-          />
-          <Button type="submit" variant="contained" color="primary" fullWidth sx={{ padding: 1 }}>
-            Register
-          </Button>
-        </form>
-      </Paper>
-    </Box>
+          <Typography variant="h4" gutterBottom align="center" sx={{ fontWeight: 'bold', color: '#333' }}>
+            Welcome to StockMaster
+          </Typography>
+          <Typography variant="h5" gutterBottom align="center" sx={{ mb: 4, color: '#555' }}>
+            Register to start managing your inventory
+          </Typography>
+          <form onSubmit={handleSubmit}>
+            <TextField
+              fullWidth
+              label="Username"
+              margin="normal"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              variant="outlined"
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              fullWidth
+              label="Email"
+              type="email"
+              margin="normal"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              variant="outlined"
+              sx={{ mb: 2 }}
+            />
+            <FormControl fullWidth variant="outlined" sx={{ mb: 2 }}>
+              <InputLabel htmlFor="password">Password</InputLabel>
+              <OutlinedInput
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                endAdornment={
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="toggle password visibility"
+                      onClick={handleClickShowPassword}
+                      edge="end"
+                    >
+                      {showPassword ? <Visibility /> : <VisibilityOff />}
+                    </IconButton>
+                  </InputAdornment>
+                }
+                label="Password"
+              />
+            </FormControl>
+            <FormControl fullWidth variant="outlined" sx={{ mb: 2 }}>
+              <InputLabel htmlFor="confirm-password">Confirm Password</InputLabel>
+              <OutlinedInput
+                id="confirm-password"
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                endAdornment={
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="toggle confirm password visibility"
+                      onClick={handleClickShowConfirmPassword}
+                      edge="end"
+                    >
+                      {showConfirmPassword ? <Visibility /> : <VisibilityOff />}
+                    </IconButton>
+                  </InputAdornment>
+                }
+                label="Confirm Password"
+              />
+            </FormControl>
+            <Button type="submit" variant="contained" color="primary" fullWidth sx={{ padding: 1 }}>
+              Register
+            </Button>
+          </form>
+        </Paper>
+      </Box>
+    </Layout>
   );
 };
 
 export default RegisterPage;
+
+
+
 
 
 

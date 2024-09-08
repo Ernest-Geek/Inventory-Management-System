@@ -1,129 +1,175 @@
-'use client';
+'use client'
 import React, { useState } from 'react';
-import { Container, Typography, TextField, Button, Paper, Grid } from '@mui/material';
+import { Formik, Field, Form, ErrorMessage } from 'formik';
+import * as Yup from 'yup';
+import { TextField, Button, Box, Typography, Container, Paper, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
 import axios from 'axios';
 
-const AddProduct = () => {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
-  const [stock, setStock] = useState('');
-  const [category, setCategory] = useState('');
+// Validation schema
+const validationSchema = Yup.object({
+  name: Yup.string()
+    .matches(/^[A-Za-z\s]+$/, 'Product name must contain only letters and spaces')
+    .required('Product name is required'),
+  description: Yup.string()
+    .required('Description is required'),
+  price: Yup.number()
+    .typeError('Price must be a number')
+    .positive('Price must be greater than zero')
+    .required('Price is required'),
+  stock: Yup.number()
+    .typeError('Stock must be a number')
+    .integer('Stock must be an integer')
+    .min(0, 'Stock cannot be negative')
+    .required('Stock is required'),
+});
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const AddProduct = ({ onProductAdded }) => {
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState('');
+  const [success, setSuccess] = useState(true);
+
+  const handleClose = () => {
+    setOpen(false);
+  };
+
+  const handleSubmit = async (values) => {
     try {
-      const response = await axios.post('http://localhost:5000/api/add_product', {
-        name,
-        description,
-        price,
-        quantity: stock, // Assuming quantity maps to stock
-        category
-      }, {
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      if (response.status === 201) {
-        alert('Product added successfully');
-        // Clear form fields
-        setName('');
-        setDescription('');
-        setPrice('');
-        setStock('');
-        setCategory('');
-      } else {
-        alert('Failed to add product');
-      }
+      await axios.post('http://localhost:5000/api/add_product', values);
+      setSuccess(true);
+      setMessage('Product added successfully');
+      onProductAdded(); // Notify parent to refresh product list
     } catch (error) {
-      console.error('Error adding product:', error);
-      alert('Failed to add product');
+      setSuccess(false);
+      setMessage('Failed to add product');
+    } finally {
+      setOpen(true);
     }
   };
 
   return (
     <Container maxWidth="sm">
-      <Typography variant="h4" gutterBottom align="center" sx={{ mb: 4, fontWeight: 700 }}>
+      <Typography variant="h4" gutterBottom sx={{ mb: 4, textAlign: 'center', fontWeight: 700 }}>
         Add New Product
       </Typography>
-      <Paper elevation={6} sx={{ p: 4, borderRadius: 3 }}>
-        <form onSubmit={handleSubmit}>
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
-              <TextField
-                label="Product Name"
-                fullWidth
-                variant="outlined"
-                margin="normal"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                sx={{ mb: 2 }}
-                required
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Description"
-                fullWidth
-                variant="outlined"
-                margin="normal"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                sx={{ mb: 2 }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Stock"
-                type="number"
-                fullWidth
-                variant="outlined"
-                margin="normal"
-                value={stock}
-                onChange={(e) => setStock(e.target.value)}
-                sx={{ mb: 2 }}
-                required
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Price"
-                type="number"
-                fullWidth
-                variant="outlined"
-                margin="normal"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                sx={{ mb: 2 }}
-                required
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                label="Category"
-                fullWidth
-                variant="outlined"
-                margin="normal"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                sx={{ mb: 2 }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Button
-                type="submit"
-                variant="contained"
-                color="primary"
-                fullWidth
-                sx={{ py: 1.5 }}
-              >
+      <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
+        <Formik
+          initialValues={{ name: '', description: '', price: '', stock: '' }}
+          validationSchema={validationSchema}
+          onSubmit={handleSubmit}
+        >
+          {() => (
+            <Form>
+              <Box sx={{ mb: 3 }}>
+                <Field
+                  as={TextField}
+                  name="name"
+                  label="Product Name"
+                  fullWidth
+                  variant="outlined"
+                  helperText={<ErrorMessage name="name" />}
+                  error={Boolean(<ErrorMessage name="name" />)}
+                  sx={{
+                    '& .MuiFormHelperText-root': {
+                      color: 'blue',
+                    },
+                    '& .MuiFormControl-root': {
+                      '& .MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'blue',
+                      },
+                    },
+                  }}
+                />
+              </Box>
+              <Box sx={{ mb: 3 }}>
+                <Field
+                  as={TextField}
+                  name="description"
+                  label="Description"
+                  fullWidth
+                  variant="outlined"
+                  helperText={<ErrorMessage name="description" />}
+                  error={Boolean(<ErrorMessage name="description" />)}
+                  sx={{
+                    '& .MuiFormHelperText-root': {
+                      color: 'blue',
+                    },
+                    '& .MuiFormControl-root': {
+                      '& .MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'blue',
+                      },
+                    },
+                  }}
+                />
+              </Box>
+              <Box sx={{ mb: 3 }}>
+                <Field
+                  as={TextField}
+                  name="price"
+                  label="Price"
+                  type="number"
+                  fullWidth
+                  variant="outlined"
+                  helperText={<ErrorMessage name="price" />}
+                  error={Boolean(<ErrorMessage name="price" />)}
+                  sx={{
+                    '& .MuiFormHelperText-root': {
+                      color: 'blue',
+                    },
+                    '& .MuiFormControl-root': {
+                      '& .MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'blue',
+                      },
+                    },
+                  }}
+                />
+              </Box>
+              <Box sx={{ mb: 3 }}>
+                <Field
+                  as={TextField}
+                  name="stock"
+                  label="Stock"
+                  type="number"
+                  fullWidth
+                  variant="outlined"
+                  helperText={<ErrorMessage name="stock" />}
+                  error={Boolean(<ErrorMessage name="stock" />)}
+                  sx={{
+                    '& .MuiFormHelperText-root': {
+                      color: 'blue',
+                    },
+                    '& .MuiFormControl-root': {
+                      '& .MuiOutlinedInput-root.Mui-error .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'blue',
+                      },
+                    },
+                  }}
+                />
+              </Box>
+              <Button type="submit" variant="contained" color="primary">
                 Add Product
               </Button>
-            </Grid>
-          </Grid>
-        </form>
+            </Form>
+          )}
+        </Formik>
       </Paper>
+
+      {/* Modal Dialog */}
+      <Dialog open={open} onClose={handleClose}>
+        <DialogTitle>{success ? 'Success' : 'Error'}</DialogTitle>
+        <DialogContent>
+          <Typography>{message}</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleClose} color="primary">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };
 
 export default AddProduct;
+
+
+

@@ -1,16 +1,21 @@
-'use client';
-import React, { useEffect, useState } from 'react';
+'use client'
+import React, { useState, useEffect } from 'react';
 import {
-  Container, Typography, Grid, Paper, Box, Divider,
+  Container, Typography, Box, Divider,
   AppBar, CssBaseline, Drawer, IconButton, List, ListItem,
-  ListItemIcon, ListItemText, Toolbar, Button
+  ListItemIcon, ListItemText, Toolbar, Table, TableBody,
+  TableCell, TableContainer, TableHead, TableRow, TablePagination, Paper, Card, CardContent
 } from '@mui/material';
 import {
-  Menu as MenuIcon, Dashboard as DashboardIcon, AddCircle, Edit, People, BarChart, Assessment, Logout
+  Menu as MenuIcon, AddCircle, Edit as EditIcon, People, BarChart, Assessment, Logout, Delete as DeleteIcon, Dashboard as DashboardIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/system';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
-import { format } from 'date-fns';
+import AddProduct from '../add-product/page';
+import UpdateStock from '../update_stock/page';
+import UserRoles from '../user_roles/page';
+import TrackSales from '../track_sales/page';
+import GenerateReport from '../generate_report/page';
+import { useSnackbar } from 'notistack';
 import axios from 'axios';
 
 const drawerWidth = 240;
@@ -29,34 +34,62 @@ const AppBarStyled = styled(AppBar)(({ theme }) => ({
   width: { sm: `calc(100% - ${drawerWidth}px)` },
   marginLeft: { sm: `${drawerWidth}px` },
   backgroundColor: '#1976d2',
-  zIndex: 1201, // Ensure the AppBar is on top of the Drawer
+  zIndex: 1201,
 }));
 
-const Dashboard = () => {
+const WelcomingCard = styled(Card)(({ theme }) => ({
+  marginBottom: theme.spacing(3),
+  backgroundColor: '#2196f3',
+  color: '#fff',
+  borderRadius: theme.shape.borderRadius,
+  boxShadow: theme.shadows ? theme.shadows[5] : '0px 4px 8px rgba(0, 0, 0, 0.2)',
+}));
+
+const WelcomingCardContent = styled(CardContent)(({ theme }) => ({
+  textAlign: 'center',
+  padding: theme.spacing(4),
+}));
+
+const DashboardPage = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [dashboardData, setDashboardData] = useState({
-    totalProducts: 0,
-    totalStock: 0,
-    recentSales: [],
-    lowStockItems: []
-  });
+  const [currentView, setCurrentView] = useState('dashboard');
+  const [products, setProducts] = useState([]);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [selectedProductId, setSelectedProductId] = useState(null);
+  const { enqueueSnackbar } = useSnackbar();
 
-  // useEffect(() => {
-  //   // Fetch dashboard data
-  //   const fetchData = async () => {
-  //     const response = await axios.get('http://localhost:5000/api/overview');
-  //     const data = await response.json();
-  //     setDashboardData(data);
-  //   };
+  useEffect(() => {
+    fetchProducts();
+  }, []);
 
-  //   fetchData();
-  // }, []);
+  const fetchProducts = async () => {
+    try {
+      const response = await axios.get(`http://localhost:5000/api/products`);
+      if (response.status !== 200) throw new Error('Network response was not ok');
+      const data = response.data;
+      setProducts(data);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      enqueueSnackbar('Error fetching products', { variant: 'error' });
+    }
+  };
 
-  // Format date for sales chart
-  const formatDate = (date) => format(new Date(date), 'MM/dd/yyyy');
+  const handleDeleteProduct = async (productId) => {
+    try {
+      const response = await axios.delete(`http://localhost:5000/api/products/${productId}`);
+      if (response.status !== 200) throw new Error('Network response was not ok');
+      fetchProducts(); // Refresh the product list after deletion
+      enqueueSnackbar('Product deleted successfully', { variant: 'success' });
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      enqueueSnackbar('Error deleting product', { variant: 'error' });
+    }
+  };
 
-  const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
+  const handleUpdateProduct = (productId) => {
+    setSelectedProductId(productId);
+    setCurrentView('updateStock');
   };
 
   const handleLogout = async () => {
@@ -67,62 +100,143 @@ const Dashboard = () => {
           'Content-Type': 'application/json',
         },
       });
-      window.location.href = '/login';
+      window.location.href = '/';
     } catch (error) {
       console.error('Logout failed:', error);
     }
   };
-  
-  
 
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
+  };
+
+  const handleNavigation = (view) => {
+    setCurrentView(view);
+    setMobileOpen(false); // Close the drawer on mobile after selection
+  };
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const renderProductActions = (productId) => (
+    <>
+      <IconButton onClick={() => handleUpdateProduct(productId)} color="primary">
+        <EditIcon />
+      </IconButton>
+      <IconButton onClick={() => handleDeleteProduct(productId)} color="error">
+        <DeleteIcon />
+      </IconButton>
+    </>
+  );
+
+  const renderContent = () => {
+    if (currentView === 'dashboard') {
+      return (
+        <Container maxWidth="lg">
+          <WelcomingCard>
+            <WelcomingCardContent>
+              <Typography variant="h4" gutterBottom>
+                Welcome to the Dashboard!
+              </Typography>
+              <Typography variant="body1">
+                Here you can view and manage all your products. Use the sidebar to navigate through other sections.
+              </Typography>
+            </WelcomingCardContent>
+          </WelcomingCard>
+          <Typography variant="h6" gutterBottom sx={{ fontWeight: 700, mb: 2 }}>
+            Products
+          </Typography>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Description</TableCell>
+                  <TableCell>Price</TableCell>
+                  <TableCell>Stock</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {products.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell>{product.name}</TableCell>
+                    <TableCell>{product.description}</TableCell>
+                    <TableCell>${product.price.toFixed(2)}</TableCell>
+                    <TableCell>{product.stock}</TableCell>
+                    <TableCell>{renderProductActions(product.id)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25]}
+              component="div"
+              count={products.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+            />
+          </TableContainer>
+        </Container>
+      );
+    }
+
+    switch (currentView) {
+      case 'add-Product':
+        return <AddProduct onProductAdded={fetchProducts} />;
+      case 'update_Stock':
+        return <UpdateStock productId={selectedProductId} />;
+      case 'user_roles':
+        return <UserRoles />;
+      case 'track_sales':
+        return <TrackSales />;
+      case 'generate_report':
+        return <GenerateReport />;
+      default:
+        return <Typography variant="h5">Select a section from the sidebar.</Typography>;
+    }
+  };
+
+  // Define the drawer content
   const drawer = (
     <div>
       <Toolbar />
       <Divider />
       <List>
-        <ListItem button component="a" href="/">
-          <ListItemIcon>
-            <DashboardIcon />
-          </ListItemIcon>
+        <ListItem button onClick={() => handleNavigation('dashboard')}>
+          <ListItemIcon><DashboardIcon /></ListItemIcon>
           <ListItemText primary="Dashboard" />
         </ListItem>
-        <Divider />
-        <ListItem button component="a" href="/add-product">
-          <ListItemIcon>
-            <AddCircle />
-          </ListItemIcon>
+        <ListItem button onClick={() => handleNavigation('add-Product')}>
+          <ListItemIcon><AddCircle /></ListItemIcon>
           <ListItemText primary="Add Product" />
         </ListItem>
-        <ListItem button component="a" href="/update_stock">
-          <ListItemIcon>
-            <Edit />
-          </ListItemIcon>
+        <ListItem button onClick={() => handleNavigation('update_Stock')}>
+          <ListItemIcon><EditIcon /></ListItemIcon>
           <ListItemText primary="Update Stock" />
         </ListItem>
-        <ListItem button component="a" href="/user_roles">
-          <ListItemIcon>
-            <People />
-          </ListItemIcon>
+        <ListItem button onClick={() => handleNavigation('user_roles')}>
+          <ListItemIcon><People /></ListItemIcon>
           <ListItemText primary="User Roles" />
         </ListItem>
-        <Divider />
-        <ListItem button component="a" href="/track_sales">
-          <ListItemIcon>
-            <BarChart />
-          </ListItemIcon>
+        <ListItem button onClick={() => handleNavigation('track_sales')}>
+          <ListItemIcon><BarChart /></ListItemIcon>
           <ListItemText primary="Track Sales" />
         </ListItem>
-        <ListItem button component="a" href="/generate_report">
-          <ListItemIcon>
-            <Assessment />
-          </ListItemIcon>
+        <ListItem button onClick={() => handleNavigation('generate_report')}>
+          <ListItemIcon><Assessment /></ListItemIcon>
           <ListItemText primary="Generate Report" />
         </ListItem>
-        <Divider />
         <ListItem button onClick={handleLogout}>
-          <ListItemIcon>
-            <Logout />
-          </ListItemIcon>
+          <ListItemIcon><Logout /></ListItemIcon>
           <ListItemText primary="Logout" />
         </ListItem>
       </List>
@@ -180,72 +294,30 @@ const Dashboard = () => {
       </Box>
       <StyledMainBox component="main">
         <Toolbar />
-        <Container maxWidth="lg">
-          <Typography variant="h4" gutterBottom sx={{ mb: 4, textAlign: 'center', fontWeight: 700 }}>
-            Inventory Dashboard
-          </Typography>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={4}>
-              <Paper elevation={3} sx={{ p: 3, textAlign: 'center', borderRadius: 2 }}>
-                <Typography variant="h6" sx={{ mb: 1 }}>Total Products</Typography>
-                <Typography variant="h3" sx={{ fontWeight: 700, color: '#1976d2' }}>
-                  {dashboardData.totalProducts}
-                </Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Paper elevation={3} sx={{ p: 3, textAlign: 'center', borderRadius: 2 }}>
-                <Typography variant="h6" sx={{ mb: 1 }}>Total Stock</Typography>
-                <Typography variant="h3" sx={{ fontWeight: 700, color: '#1976d2' }}>
-                  {dashboardData.totalStock}
-                </Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Paper elevation={3} sx={{ p: 3, textAlign: 'center', borderRadius: 2 }}>
-                <Typography variant="h6" sx={{ mb: 1 }}>Low Stock Items</Typography>
-                <Typography variant="h5" sx={{ fontWeight: 700, color: '#d32f2f' }}>
-                  {dashboardData.lowStockItems.length}
-                </Typography>
-              </Paper>
-            </Grid>
-          </Grid>
-          <Divider sx={{ my: 4 }} />
-          <Typography variant="h6" gutterBottom sx={{ textAlign: 'center', fontWeight: 700 }}>
-            Recent Sales
-          </Typography>
-          <Box sx={{ height: 400, mb: 4 }}>
-            <LineChart width="100%" height="100%" data={dashboardData.recentSales}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="sale_date" tickFormatter={formatDate} />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="total_price" stroke="#8884d8" strokeWidth={3} />
-            </LineChart>
-          </Box>
-          <Divider sx={{ my: 4 }} />
-          <Typography variant="h6" gutterBottom sx={{ fontWeight: 700 }}>
-            Low Stock Items
-          </Typography>
-          <Grid container spacing={2}>
-            {dashboardData.lowStockItems.map((item) => (
-              <Grid item xs={12} md={4} key={item.id}>
-                <Paper elevation={2} sx={{ p: 2, textAlign: 'center', borderRadius: 2 }}>
-                  <Typography variant="h6" sx={{ mb: 1 }}>{item.name}</Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 700, color: '#d32f2f' }}>
-                    Stock: {item.stock}
-                  </Typography>
-                </Paper>
-              </Grid>
-            ))}
-          </Grid>
-        </Container>
+        {renderContent()}
       </StyledMainBox>
     </Box>
   );
 };
 
-export default Dashboard;
+export default DashboardPage;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
