@@ -4,21 +4,28 @@ import {
   Container, Typography, Box, Divider,
   AppBar, CssBaseline, Drawer, IconButton, List, ListItem,
   ListItemIcon, ListItemText, Toolbar, Table, TableBody,
-  TableCell, TableContainer, TableHead, TableRow, TablePagination, Paper, Card, CardContent
+  TableCell, TableContainer, TableHead, TableRow, TablePagination, Paper, Card, CardContent,
+  Dialog, DialogActions, DialogContent, DialogTitle, TextField, Button
 } from '@mui/material';
 import {
   Menu as MenuIcon, AddCircle, Edit as EditIcon, People, BarChart, Assessment, Logout, Delete as DeleteIcon, Dashboard as DashboardIcon
 } from '@mui/icons-material';
 import { styled } from '@mui/system';
+import axios from 'axios';
+import { useSnackbar } from 'notistack';
 import AddProduct from '../add-product/page';
-import UpdateStock from '../update_stock/page';
-import UserRoles from '../user_roles/page';
+import UserRoles  from '../user_roles/page';
 import TrackSales from '../track_sales/page';
 import GenerateReport from '../generate_report/page';
-import { useSnackbar } from 'notistack';
-import axios from 'axios';
 
 const drawerWidth = 240;
+
+const AppBarStyled = styled(AppBar)(({ theme }) => ({
+  width: { sm: `calc(100% - ${drawerWidth}px)` },
+  marginLeft: { sm: `${drawerWidth}px` },
+  backgroundColor: '#1976d2',
+  zIndex: 1201,
+}));
 
 const StyledMainBox = styled(Box)(({ theme }) => ({
   flexGrow: 1,
@@ -28,13 +35,6 @@ const StyledMainBox = styled(Box)(({ theme }) => ({
   backgroundColor: '#f5f5f5',
   color: '#333',
   position: 'relative',
-}));
-
-const AppBarStyled = styled(AppBar)(({ theme }) => ({
-  width: { sm: `calc(100% - ${drawerWidth}px)` },
-  marginLeft: { sm: `${drawerWidth}px` },
-  backgroundColor: '#1976d2',
-  zIndex: 1201,
 }));
 
 const WelcomingCard = styled(Card)(({ theme }) => ({
@@ -57,6 +57,8 @@ const DashboardPage = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [selectedProductId, setSelectedProductId] = useState(null);
+  const [openUpdateStockModal, setOpenUpdateStockModal] = useState(false);
+  const [stock, setStock] = useState('');
   const { enqueueSnackbar } = useSnackbar();
 
   useEffect(() => {
@@ -87,9 +89,27 @@ const DashboardPage = () => {
     }
   };
 
-  const handleUpdateProduct = (productId) => {
+  const handleOpenUpdateStockModal = (productId) => {
     setSelectedProductId(productId);
-    setCurrentView('updateStock');
+    setOpenUpdateStockModal(true);
+  };
+
+  const handleCloseUpdateStockModal = () => {
+    setOpenUpdateStockModal(false);
+    setStock('');
+  };
+
+  const handleUpdateStock = async () => {
+    try {
+      const response = await axios.put(`http://localhost:5000/api/products/${selectedProductId}/update_stock`, { stock: parseInt(stock, 10) });
+      if (response.status !== 200) throw new Error('Network response was not ok');
+      fetchProducts(); // Refresh the product list after updating stock
+      enqueueSnackbar('Stock updated successfully', { variant: 'success' });
+      handleCloseUpdateStockModal();
+    } catch (error) {
+      console.error('Error updating stock:', error);
+      enqueueSnackbar('Error updating stock', { variant: 'error' });
+    }
   };
 
   const handleLogout = async () => {
@@ -126,7 +146,7 @@ const DashboardPage = () => {
 
   const renderProductActions = (productId) => (
     <>
-      <IconButton onClick={() => handleUpdateProduct(productId)} color="primary">
+      <IconButton onClick={() => handleOpenUpdateStockModal(productId)} color="primary">
         <EditIcon />
       </IconButton>
       <IconButton onClick={() => handleDeleteProduct(productId)} color="error">
@@ -192,8 +212,6 @@ const DashboardPage = () => {
     switch (currentView) {
       case 'add-Product':
         return <AddProduct onProductAdded={fetchProducts} />;
-      case 'update_Stock':
-        return <UpdateStock productId={selectedProductId} />;
       case 'user_roles':
         return <UserRoles />;
       case 'track_sales':
@@ -219,10 +237,7 @@ const DashboardPage = () => {
           <ListItemIcon><AddCircle /></ListItemIcon>
           <ListItemText primary="Add Product" />
         </ListItem>
-        <ListItem button onClick={() => handleNavigation('update_Stock')}>
-          <ListItemIcon><EditIcon /></ListItemIcon>
-          <ListItemText primary="Update Stock" />
-        </ListItem>
+        {/* Removed Update Stock from the drawer */}
         <ListItem button onClick={() => handleNavigation('user_roles')}>
           <ListItemIcon><People /></ListItemIcon>
           <ListItemText primary="User Roles" />
@@ -295,12 +310,37 @@ const DashboardPage = () => {
       <StyledMainBox component="main">
         <Toolbar />
         {renderContent()}
+        {/* Modal for Updating Stock */}
+        <Dialog open={openUpdateStockModal} onClose={handleCloseUpdateStockModal}>
+          <DialogTitle>Update Stock</DialogTitle>
+          <DialogContent>
+            <TextField
+              autoFocus
+              margin="dense"
+              label="Stock Quantity"
+              type="number"
+              fullWidth
+              value={stock}
+              onChange={(e) => setStock(e.target.value)}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseUpdateStockModal} color="primary">
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateStock} color="primary">
+              Update
+            </Button>
+          </DialogActions>
+        </Dialog>
       </StyledMainBox>
     </Box>
   );
 };
 
 export default DashboardPage;
+
+
 
 
 

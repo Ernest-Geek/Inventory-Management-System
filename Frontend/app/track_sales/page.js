@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import {
   Container, Typography, Box, TextField, Button, Table,
   TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton,
-  Dialog, DialogActions, DialogContent, DialogTitle, Paper
+  Dialog, DialogActions, DialogContent, DialogTitle, Paper, Card, CardContent,
+  useTheme
 } from '@mui/material';
 import { Search as SearchIcon, Visibility as VisibilityIcon } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers';
@@ -17,6 +18,8 @@ const TrackSales = () => {
   const [selectedDate, setSelectedDate] = useState(null);
   const [open, setOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
+  
+  const theme = useTheme();
 
   useEffect(() => {
     fetchSales();
@@ -59,6 +62,19 @@ const TrackSales = () => {
         <Typography variant="h4" gutterBottom sx={{ textAlign: 'center', fontWeight: 700, mt: 4 }}>
           Track Sales
         </Typography>
+        <Card sx={{
+          marginBottom: theme.spacing(3),
+          backgroundColor: '#2196f3',
+          color: '#fff',
+          borderRadius: theme.shape.borderRadius,
+          boxShadow: theme.shadows ? theme.shadows[5] : '0px 4px 8px rgba(0, 0, 0, 0.2)',
+        }}>
+          <CardContent>
+            <Typography variant="body1">
+            View and manage your sales data here. Use the date picker to filter by date or see all sales. Click the "View" icon for details on each sale.
+            </Typography>
+          </CardContent>
+        </Card>
         <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <DatePicker
             label="Search by Date"
@@ -118,6 +134,8 @@ const TrackSales = () => {
 };
 
 export default TrackSales;
+
+
 
 
 
