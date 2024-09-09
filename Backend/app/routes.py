@@ -6,6 +6,7 @@ from itsdangerous import URLSafeTimedSerializer, SignatureExpired
 from app.models import db, User, Role, Product, Sale
 from app import mail, bcrypt
 from sqlalchemy import text
+from app.utils import verify_reset_token, send_reset_password_email, generate_reset_token
 from flask_bcrypt import Bcrypt
 from sqlalchemy import and_
 from sqlalchemy.exc import IntegrityError
@@ -86,22 +87,24 @@ def forgot_password():
 
     token = s.dumps(email, salt='password-reset-salt') 
 
-    msg = Message('Password Reset Request', sender='noreply@demo.com', recipients=[email])
-    link = url_for('routes.reset_password', token=token, _external=True)
+    msg = Message('Password Reset Request', sender='ernestampene1@gmail.com', recipients=[email])
+    link = url_for('main.reset_password', token=token, _external=True)
     msg.body = f'Your link to reset the password is {link}. This link will expire in 30 minutes.'
     mail.send(msg)
 
     return jsonify({"message": "Password reset email sent successfully"}), 200
 
+
+
 @bp.route("/api/reset_password/<token>", methods=['POST'])
 def reset_password(token):
     try:
-        email = s.loads(token, salt='password-reset-salt', max_age=1800)  #
-    except SignatureExpired:
-        return jsonify({"message": "The token has expired"}), 400
+        email = verify_reset_token(token, expiration=1800)
+        if not email:
+            return jsonify({"message": "Invalid or expired token"}), 400
     except Exception as e:
-        return jsonify({"message": "Invalid or tampered token"}), 400
-    
+        return jsonify({"message": "Error verifying token"}), 400
+
     data = request.json
     new_password = data.get('password')
 
@@ -111,11 +114,29 @@ def reset_password(token):
     user = User.query.filter_by(email=email).first()
     if not user:
         return jsonify({"message": "User not found"}), 404
-    
+
     user.password_hash = bcrypt.generate_password_hash(new_password).decode('utf-8')
     db.session.commit()
 
+    # Send confirmation email
+    # send_reset_password_email(user.email, token)
+
     return jsonify({"message": "Password has been reset successfully"}), 200
+
+@bp.route("/api/request_password_reset", methods=['POST'])
+def request_password_reset():
+    data = request.json
+    email = data.get('email')
+    
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+
+    token = generate_reset_token(email)
+    send_reset_password_email(email, token)
+
+    return jsonify({"message": "Password reset email sent"}), 200
+
 
 @bp.route('/api/add_product', methods=['POST'])
 def add_product():
