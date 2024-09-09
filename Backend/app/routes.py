@@ -10,6 +10,8 @@ from app.utils import verify_reset_token, send_reset_password_email, generate_re
 from flask_bcrypt import Bcrypt
 from sqlalchemy import and_
 from sqlalchemy.exc import IntegrityError
+from app.decorators import permission_required
+
 import re
 
 bcrypt = Bcrypt() 

@@ -1,19 +1,27 @@
 from functools import wraps
 from flask import request, jsonify
-from flask_jwt_extended import get_jwt_identity, jwt_required
-from app import db
-from app.models import User  # Ensure you import the User model
+from app.models import User  # Adjust the import based on your project structure
+from flask_login import current_user
 
-def role_required(roles):
-    def wrapper(f):
+
+def permission_required(permission_name):
+    def decorator(f):
         @wraps(f)
-        @jwt_required()
-        def decorated_function(*args, **kwargs):
-            user_id = get_jwt_identity()
-            current_user = User.query.filter_by(id=user_id).first()
-            if not current_user or current_user.role.name not in roles:
-                return jsonify({"message": "Access denied"}), 403
+        def wrapper(*args, **kwargs):
+            if not current_user.is_authenticated:
+                return jsonify({'message': 'Unauthorized'}), 401
+
+            user = User.query.get(current_user.id)
+            if not user:
+                return jsonify({'message': 'User not found'}), 404
+
+            # Get user permissions
+            user_permissions = {perm.name for role in user.role.permissions for perm in role.permissions}
+            if permission_name not in user_permissions:
+                return jsonify({'message': 'Forbidden'}), 403
+
             return f(*args, **kwargs)
-        return decorated_function
-    return wrapper
+        return wrapper
+    return decorator
+
 
