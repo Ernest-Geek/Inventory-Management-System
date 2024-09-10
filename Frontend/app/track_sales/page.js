@@ -1,139 +1,111 @@
 'use client';
+
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
-  Container, Typography, Box, TextField, Button, Table,
-  TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton,
-  Dialog, DialogActions, DialogContent, DialogTitle, Paper, Card, CardContent,
-  useTheme
+  Container, Typography, Box, TextField, Table, TableBody,
+  TableCell, TableContainer, TableHead, TableRow, Paper, CircularProgress
 } from '@mui/material';
-import { Search as SearchIcon, Visibility as VisibilityIcon } from '@mui/icons-material';
-import { DatePicker } from '@mui/x-date-pickers';
-import { format, parseISO, isValid } from 'date-fns';
-import { LocalizationProvider } from '@mui/x-date-pickers';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 
 const TrackSales = () => {
   const [sales, setSales] = useState([]);
-  const [filteredSales, setFilteredSales] = useState([]);
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [open, setOpen] = useState(false);
-  const [selectedSale, setSelectedSale] = useState(null);
-  
-  const theme = useTheme();
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [chartData, setChartData] = useState([]);
 
   useEffect(() => {
+    const fetchSales = async () => {
+      try {
+        const response = await axios.get('http://localhost:5000/api/sales');
+        if (response.status === 200) {
+          setSales(response.data);
+          processChartData(response.data); // Process data for chart
+        }
+      } catch (error) {
+        console.error('Error fetching sales data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchSales();
+    const intervalId = setInterval(fetchSales, 60000); // Refresh every 60 seconds
+
+    return () => clearInterval(intervalId); // Cleanup on unmount
   }, []);
 
-  const fetchSales = async () => {
-    try {
-      const response = await fetch('http://localhost:5000/api/sales');
-      const data = await response.json();
-      setSales(data);
-      setFilteredSales(data);
-    } catch (error) {
-      console.error('Error fetching sales:', error);
-    }
+  const processChartData = (salesData) => {
+    const formattedData = salesData.map(sale => ({
+      date: new Date(sale.sale_date).toLocaleDateString(),
+      totalPrice: sale.total_price
+    }));
+    setChartData(formattedData);
   };
 
-  const handleDateChange = (date) => {
-    setSelectedDate(date);
-    if (date && isValid(date)) {
-      const formattedDate = format(date, 'yyyy-MM-dd');
-      const filtered = sales.filter(sale => format(parseISO(sale.sale_date), 'yyyy-MM-dd') === formattedDate);
-      setFilteredSales(filtered);
-    } else {
-      setFilteredSales(sales);
-    }
-  };
+  const filteredSales = sales.filter(sale =>
+    sale.product_name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const handleViewDetails = (sale) => {
-    setSelectedSale(sale);
-    setOpen(true);
-  };
-
-  const handleClose = () => {
-    setOpen(false);
-  };
+  if (loading) return <CircularProgress />;
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Container maxWidth="md">
-        <Typography variant="h4" gutterBottom sx={{ textAlign: 'center', fontWeight: 700, mt: 4 }}>
-          Track Sales
+    <Container maxWidth="lg">
+      <Typography variant="h4" gutterBottom>
+        Track Sales
+      </Typography>
+      <TextField
+        label="Search Sales"
+        variant="outlined"
+        fullWidth
+        margin="normal"
+        onChange={(e) => setSearchQuery(e.target.value)}
+      />
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h6" gutterBottom>
+          Sales Chart
         </Typography>
-        <Card sx={{
-          marginBottom: theme.spacing(3),
-          backgroundColor: '#2196f3',
-          color: '#fff',
-          borderRadius: theme.shape.borderRadius,
-          boxShadow: theme.shadows ? theme.shadows[5] : '0px 4px 8px rgba(0, 0, 0, 0.2)',
-        }}>
-          <CardContent>
-            <Typography variant="body1">
-            View and manage your sales data here. Use the date picker to filter by date or see all sales. Click the "View" icon for details on each sale.
-            </Typography>
-          </CardContent>
-        </Card>
-        <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <DatePicker
-            label="Search by Date"
-            value={selectedDate}
-            onChange={handleDateChange}
-            renderInput={(params) => <TextField {...params} />}
-          />
-          <Button variant="contained" color="primary" onClick={() => handleDateChange(selectedDate)} startIcon={<SearchIcon />}>
-            Search
-          </Button>
-        </Box>
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Date</TableCell>
-                <TableCell>Product</TableCell>
-                <TableCell>Amount</TableCell>
-                <TableCell align="right">Actions</TableCell>
+        <LineChart width={600} height={300} data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="date" />
+          <YAxis />
+          <Tooltip />
+          <Legend />
+          <Line type="monotone" dataKey="totalPrice" stroke="#8884d8" />
+        </LineChart>
+      </Box>
+      <Typography variant="h6" gutterBottom>
+        Sales Data
+      </Typography>
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Date</TableCell>
+              <TableCell>Product</TableCell>
+              <TableCell>Total Price</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filteredSales.map((sale) => (
+              <TableRow key={sale.id}>
+                <TableCell>{new Date(sale.sale_date).toLocaleDateString()}</TableCell>
+                <TableCell>{sale.product_name}</TableCell>
+                <TableCell>${sale.total_price.toFixed(2)}</TableCell>
               </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredSales.map((sale) => (
-                <TableRow key={sale.id}>
-                  <TableCell>{format(parseISO(sale.sale_date), 'MM/dd/yyyy')}</TableCell>
-                  <TableCell>{sale.product_name}</TableCell>
-                  <TableCell>${sale.total_price.toFixed(2)}</TableCell>
-                  <TableCell align="right">
-                    <IconButton onClick={() => handleViewDetails(sale)} color="primary">
-                      <VisibilityIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-
-        <Dialog open={open} onClose={handleClose}>
-          <DialogTitle>Sale Details</DialogTitle>
-          <DialogContent>
-            {selectedSale && (
-              <>
-                <Typography variant="body1"><strong>Date:</strong> {format(parseISO(selectedSale.sale_date), 'MM/dd/yyyy')}</Typography>
-                <Typography variant="body1"><strong>Product:</strong> {selectedSale.product_name}</Typography>
-                <Typography variant="body1"><strong>Amount:</strong> ${selectedSale.total_price.toFixed(2)}</Typography>
-              </>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleClose} color="primary">Close</Button>
-          </DialogActions>
-        </Dialog>
-      </Container>
-    </LocalizationProvider>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Container>
   );
 };
 
 export default TrackSales;
+
+
+
+
 
 
 

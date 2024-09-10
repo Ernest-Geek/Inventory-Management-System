@@ -86,6 +86,7 @@ const UserRolesPage = () => {
         boxShadow: theme => theme.shadows ? theme.shadows[5] : '0px 4px 8px rgba(0, 0, 0, 0.2)',
       }}>
         <CardContent>
+
           <Typography variant="body1">
             Manage user roles within your application. Use the buttons to add, edit, or delete roles. Each role can be assigned a name and description for clarity.
           </Typography>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Box, TextField, Button, Typography, Paper, Link, Slide, Snackbar, Alert } from '@mui/material';
+import { Box, TextField, Button, Typography, Paper, Link, Slide, Snackbar, Alert, IconButton } from '@mui/material';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import axios from 'axios';
 import { useRouter } from 'next/router';
 import Layout from '../components/layout'; // Adjust the import path if necessary
@@ -7,6 +8,7 @@ import Layout from '../components/layout'; // Adjust the import path if necessar
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false); // State to toggle password visibility
   const [openSnackbar, setOpenSnackbar] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const router = useRouter();
@@ -27,6 +29,10 @@ const LoginPage = () => {
 
   const handleCloseSnackbar = () => {
     setOpenSnackbar(false);
+  };
+
+  const toggleShowPassword = () => {
+    setShowPassword((prev) => !prev);
   };
 
   return (
@@ -67,16 +73,28 @@ const LoginPage = () => {
               variant="outlined"
               sx={{ mb: 2 }}
             />
-            <TextField
-              fullWidth
-              label="Password"
-              type="password"
-              margin="normal"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              variant="outlined"
-              sx={{ mb: 3 }}
-            />
+            <Box sx={{ position: 'relative', mb: 3 }}>
+              <TextField
+                fullWidth
+                label="Password"
+                type={showPassword ? 'text' : 'password'}
+                margin="normal"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                variant="outlined"
+                InputProps={{
+                  endAdornment: (
+                    <IconButton
+                      onClick={toggleShowPassword}
+                      edge="end"
+                      sx={{ position: 'absolute', right: 0, top: 0, padding: '14px' }}
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  ),
+                }}
+              />
+            </Box>
             <Button
               type="submit"
               variant="contained"
@@ -118,6 +136,7 @@ const LoginPage = () => {
 };
 
 export default LoginPage;
+
 
 
 
