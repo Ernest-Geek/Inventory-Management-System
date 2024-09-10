@@ -51,7 +51,8 @@ class Role(db.Model):
     __tablename__ = 'roles'
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50), unique=True, nullable=False)
+    name = db.Column(db.String(50), nullable=False)
+    permissions = db.relationship('Permission', backref='role', lazy=True)
 
     def __repr__(self):
         return f'<Role {self.name}>'
@@ -59,7 +60,8 @@ class Role(db.Model):
 class Permission(db.Model):
     __tablename__ = 'permissions'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50), unique=True, nullable=False)
+    name = db.Column(db.String(50), nullable=False)
+    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'), nullable=False)
 
     def __repr__(self):
         return f'<Permission {self.name}>'
@@ -86,4 +88,4 @@ class Sale(db.Model):
     quantity = db.Column(db.Integer)
     total_price = db.Column(db.Float)
     sale_date = db.Column(db.DateTime, default=db.func.current_timestamp())
-
+    

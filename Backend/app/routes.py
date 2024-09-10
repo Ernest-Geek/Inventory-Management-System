@@ -309,6 +309,71 @@ def generate_report():
     
     return jsonify(report_data)
 
+@bp.route('/api/users', methods=['GET'])
+@login_required  # Ensure the user is logged in to access this data
+@permission_required('admin')  # Replace with appropriate permission check if needed
+def get_users():
+    try:
+        users = User.query.all()  # Query all users from the database
+        user_list = [
+            {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'role': user.role.name if user.role else None  # Ensure 'role' attribute is fetched
+            }
+            for user in users
+        ]
+        return jsonify(user_list), 200
+    except Exception as e:
+        return jsonify({'message': 'Failed to fetch users', 'error': str(e)}), 500
+
+
+
+@bp.route('/api/users/<int:user_id>/role', methods=['PUT'])
+@login_required
+@permission_required('admin')
+def update_user_role(user_id):
+    data = request.get_json()
+    new_role_id = data.get('role_id')
+
+    if not new_role_id:
+        return jsonify({'message': 'Role ID is required'}), 400
+
+    try:
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'message': 'User not found'}), 404
+
+        role = Role.query.get(new_role_id)
+        if not role:
+            return jsonify({'message': 'Role not found'}), 404
+
+        user.role_id = new_role_id
+        db.session.commit()
+        return jsonify({'message': 'User role updated successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': 'Failed to update user role', 'error': str(e)}), 500
+
+
+@bp.route('/api/users/<int:user_id>', methods=['DELETE'])
+@login_required
+@permission_required('admin')
+def delete_user(user_id):
+    try:
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'message': 'User not found'}), 404
+
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({'message': 'User deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': 'Failed to delete user', 'error': str(e)}), 500
+
+
 
 
 

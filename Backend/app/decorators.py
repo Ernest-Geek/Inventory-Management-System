@@ -1,27 +1,24 @@
 from functools import wraps
-from flask import request, jsonify
-from app.models import User  # Adjust the import based on your project structure
 from flask_login import current_user
-
+from flask import jsonify
 
 def permission_required(permission_name):
-    def decorator(f):
-        @wraps(f)
+    def decorator(func):
+        @wraps(func)
         def wrapper(*args, **kwargs):
+            # Check if the user is logged in
             if not current_user.is_authenticated:
-                return jsonify({'message': 'Unauthorized'}), 401
+                return jsonify({"message": "Access forbidden: user not logged in"}), 403
 
-            user = User.query.get(current_user.id)
-            if not user:
-                return jsonify({'message': 'User not found'}), 404
+            # Check if the user has the required permission
+            role = current_user.role
+            if not role:
+                return jsonify({"message": "Access forbidden: no role assigned"}), 403
 
-            # Get user permissions
-            user_permissions = {perm.name for role in user.role.permissions for perm in role.permissions}
-            if permission_name not in user_permissions:
-                return jsonify({'message': 'Forbidden'}), 403
+            permissions = [p.name for p in role.permissions]
+            if permission_name not in permissions:
+                return jsonify({"message": "Access forbidden: insufficient permissions"}), 403
 
-            return f(*args, **kwargs)
+            return func(*args, **kwargs)
         return wrapper
     return decorator
-
-
