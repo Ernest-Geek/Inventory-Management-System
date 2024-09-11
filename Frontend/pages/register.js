@@ -23,11 +23,6 @@ const RegisterPage = () => {
       return;
     }
 
-    // Check if email is a Gmail address
-    if (!email.endsWith('@gmail.com')) {
-      alert('Only Gmail accounts can register.');
-      return;
-    }
 
     try {
       const response = await axios.post('http://localhost:5000/api/register', { username, email, password });
